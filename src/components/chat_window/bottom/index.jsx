@@ -163,14 +163,28 @@ const ChatBottom = () => {
           </span>
         </Checkbox>
 
-        <Button
-          size="xs"
-          appearance="subtle"
-          onClick={() => setIsPollModalOpen(true)}
-          style={{ fontSize: "12px", fontWeight: 600 }}
-        >
-          📊 Create Poll
-        </Button>
+        <div className="d-flex align-items-center gap-2" style={{ gap: "8px" }}>
+          <Button
+            size="xs"
+            appearance="subtle"
+            onClick={() => {
+              setInput((prev) => (prev ? `${prev}\n\`\`\`javascript\n// Write code here\n\`\`\`` : `\`\`\`javascript\n// Write code here\n\`\`\``));
+            }}
+            style={{ fontSize: "12px", fontWeight: 600 }}
+            title="Insert Code Snippet block"
+          >
+            💻 Code Snippet
+          </Button>
+
+          <Button
+            size="xs"
+            appearance="subtle"
+            onClick={() => setIsPollModalOpen(true)}
+            style={{ fontSize: "12px", fontWeight: 600 }}
+          >
+            📊 Create Poll
+          </Button>
+        </div>
       </div>
 
       <InputGroup>

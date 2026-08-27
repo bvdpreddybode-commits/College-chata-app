@@ -83,6 +83,7 @@ export const ProfileProvider = ({ children }) => {
   const signOut = useCallback(async () => {
     try {
       sessionStorage.removeItem("campus_demo_profile");
+      localStorage.removeItem("campus_demo_profile");
     } catch (e) {
       // ignore
     }

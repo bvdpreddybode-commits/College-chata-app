@@ -5,13 +5,20 @@ import { useMediaQuery, useModalState } from "../../misc/custom-hooks";
 import Dashboard from ".";
 import { supabase } from "../../misc/supabaseClient";
 
+import { useProfile } from "../../context/profile.context";
+
 const DashboardToggle = () => {
   const { isOpen, close, open } = useModalState();
   const isMobile = useMediaQuery("(max-width: 992px)");
+  const { signOut } = useProfile();
 
   const onSignOut = useCallback(async () => {
     try {
-      await supabase.auth.signOut();
+      if (signOut) {
+        await signOut();
+      } else {
+        await supabase.auth.signOut();
+      }
       toaster.push(
         <Message type="info" closable duration={4000}>
           Signed out successfully
@@ -25,7 +32,7 @@ const DashboardToggle = () => {
         </Message>
       );
     }
-  }, [close]);
+  }, [close, signOut]);
 
   return (
     <>

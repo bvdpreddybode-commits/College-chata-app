@@ -1,7 +1,9 @@
-import React, { memo } from "react";
-import { Button } from "rsuite";
+import React, { memo, useState } from "react";
+import { Button, Message, toaster } from "rsuite";
 import TimeAgo from "timeago-react";
 import AttachmentIcon from "@rsuite/icons/Attachment";
+import CopyIcon from "@rsuite/icons/Copy";
+import CheckIcon from "@rsuite/icons/Check";
 import { useCurrentRoom } from "../../../context/current-room.context";
 import { useHover, useMediaQuery } from "../../../misc/custom-hooks";
 import { useProfile } from "../../../context/profile.context";
@@ -21,6 +23,107 @@ const getFileIcon = (contentType = "") => {
   if (contentType.includes("zip") || contentType.includes("tar")) return "📦";
   if (contentType.includes("word") || contentType.includes("document")) return "📝";
   return "📁";
+};
+
+const CodeBlock = ({ codeText, language = "code" }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      style={{
+        background: "#0f172a",
+        color: "#f8fafc",
+        borderRadius: "8px",
+        padding: "10px 14px",
+        margin: "6px 0",
+        fontSize: "12px",
+        fontFamily: "Consolas, Monaco, 'Courier New', monospace",
+        position: "relative",
+        overflowX: "auto",
+        border: "1px solid #1e293b",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "1px solid #334155",
+          paddingBottom: "4px",
+          marginBottom: "8px",
+          color: "#94a3b8",
+          fontSize: "11px",
+          textTransform: "uppercase",
+          fontWeight: 700,
+        }}
+      >
+        <span>💻 {language}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: copied ? "#4ade80" : "#94a3b8",
+            cursor: "pointer",
+            fontSize: "11px",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />} {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: "#e2e8f0" }}>{codeText}</pre>
+    </div>
+  );
+};
+
+const renderMessageContent = (text) => {
+  if (!text) return null;
+
+  // Check for code blocks ```lang ... ```
+  if (text.includes("```")) {
+    const parts = text.split(/```/);
+    return parts.map((part, idx) => {
+      if (idx % 2 === 1) {
+        // Code block
+        const lines = part.split("\n");
+        const firstLine = lines[0].trim();
+        const hasLang = /^[a-zA-Z0-9_-]+$/.test(firstLine);
+        const language = hasLang ? firstLine : "code";
+        const code = hasLang ? lines.slice(1).join("\n") : part;
+        return <CodeBlock key={idx} codeText={code.trim()} language={language} />;
+      }
+      if (!part.trim()) return null;
+      return (
+        <span key={idx} style={{ whiteSpace: "pre-wrap" }}>
+          {part}
+        </span>
+      );
+    });
+  }
+
+  return (
+    <div
+      className="word-break-all"
+      style={{
+        fontSize: "14px",
+        color: "#1e293b",
+        lineHeight: 1.5,
+        whiteSpace: "pre-wrap",
+      }}
+    >
+      {text}
+    </div>
+  );
 };
 
 const renderFileMessage = (file) => {
@@ -70,6 +173,9 @@ const MessageItem = ({
   handleDelete,
   onOpenThread,
   onToggleReaction,
+  onPinMessage,
+  onVotePoll,
+  isPinned,
 }) => {
   const { author, createdAt, text, file, likes, likeCount, isAnonymous, poll, reactions } = message;
   const { profile } = useProfile();
@@ -88,16 +194,9 @@ const MessageItem = ({
   const canShowIcons = isMobile || isHovered;
   const isLiked = likes && currentUid && Object.keys(likes).includes(currentUid);
 
-  const handleContextAction = (actionKey) => {
-    if (actionKey === "reply" && onOpenThread) {
-      onOpenThread(message);
-    } else if (actionKey === "delete" && handleDelete) {
-      handleDelete(message.id, file);
-    } else if (actionKey === "react" && onToggleReaction) {
-      onToggleReaction(message.id, "❤️");
-    } else if (actionKey === "copy") {
-      navigator.clipboard.writeText(text || "");
-    }
+  const handleCopyText = (content) => {
+    navigator.clipboard.writeText(content);
+    toaster.push(<Message type="info" duration={2000}>Message text copied!</Message>);
   };
 
   return (
@@ -171,61 +270,33 @@ const MessageItem = ({
           badgeContent={likeCount}
         />
 
-        {canShowIcons && onOpenThread && (
-          <Button
-            size="xs"
-            appearance="subtle"
-            onClick={() => onOpenThread(message)}
-            title="Reply in thread"
-            style={{ padding: "2px 6px", fontSize: "11px", marginLeft: "4px" }}
-          >
-            💬 Reply
-          </Button>
-        )}
-
-        {isAuthor && (
-          <IconBtnControl
-            isVisible={canShowIcons}
-            iconName="close"
-            tooltip="Delete this message"
-            onClick={() => handleDelete(message.id, file)}
-          />
-        )}
-
         {canShowIcons && (
-          <MessageContextMenu
-            message={message}
-            isAuthor={isAuthor}
-            isAdmin={isAdmin}
-            onAction={handleContextAction}
-          >
-            <Button
-              size="xs"
-              appearance="subtle"
-              style={{ padding: "2px 4px", fontSize: "12px", marginLeft: "4px" }}
-            >
-              ⋮
-            </Button>
-          </MessageContextMenu>
+          <div style={{ marginLeft: "6px" }}>
+            <MessageContextMenu
+              message={message}
+              isAuthor={isAuthor}
+              isAdmin={isAdmin}
+              isPinned={isPinned}
+              onToggleReaction={(emoji) => onToggleReaction && onToggleReaction(message.id, emoji)}
+              onPinMessage={onPinMessage}
+              onOpenThread={onOpenThread}
+              onDeleteMessage={handleDelete}
+              onCopyText={handleCopyText}
+            />
+          </div>
         )}
       </div>
 
       <div style={{ marginLeft: "24px" }}>
-        {text && (
-          <div
-            className="word-break-all"
-            style={{
-              fontSize: "14px",
-              color: "var(--text-primary)",
-              lineHeight: 1.5,
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {text}
-          </div>
-        )}
+        {renderMessageContent(text)}
 
-        {poll && <PollCard poll={poll} currentUid={currentUid} />}
+        {poll && (
+          <PollCard
+            poll={poll}
+            currentUid={currentUid}
+            onVote={(p, optId) => onVotePoll && onVotePoll(message.id, optId)}
+          />
+        )}
 
         {file && renderFileMessage(file)}
 

@@ -9,11 +9,12 @@ import ThreadDrawer from "../threads/ThreadDrawer";
 
 const PAGE_SIZE = 50;
 
-const Messages = () => {
+const Messages = ({ onPinMessage, pinnedMessageIds = [] }) => {
   const { chatId } = useParams();
   const { profile } = useProfile();
   const [messages, setMessages] = useState([]);
   const [activeThreadMessage, setActiveThreadMessage] = useState(null);
+  const [threadReplies, setThreadReplies] = useState({});
   const [isThreadOpen, setIsThreadOpen] = useState(false);
   const selfRef = useRef();
 
@@ -155,6 +156,27 @@ const Messages = () => {
     setIsThreadOpen(true);
   };
 
+  const handleSendThreadReply = async (rootMsgId, replyText) => {
+    const currentUid = profile?.uid || profile?.id;
+    const newReply = {
+      id: "reply-" + Date.now(),
+      author: {
+        name: profile?.name || "Student",
+        uid: currentUid,
+        avatar: profile?.avatar,
+      },
+      text: replyText,
+      createdAt: new Date().toISOString(),
+    };
+
+    setThreadReplies((prev) => ({
+      ...prev,
+      [rootMsgId]: [...(prev[rootMsgId] || []), newReply],
+    }));
+
+    toaster.push(<Message type="success" duration={2500}>Thread reply posted!</Message>);
+  };
+
   const handleToggleReaction = useCallback(
     async (msgId, emoji) => {
       const currentUid = profile?.uid || profile?.id;
@@ -188,6 +210,46 @@ const Messages = () => {
     [messages, profile]
   );
 
+  const handleVotePoll = useCallback(
+    async (msgId, optionId) => {
+      const currentUid = profile?.uid || profile?.id;
+      if (!currentUid) return;
+
+      const targetMsg = messages.find((m) => m.id === msgId);
+      if (!targetMsg || !targetMsg.poll) return;
+
+      const updatedOptions = targetMsg.poll.options.map((opt) => {
+        const votes = Array.isArray(opt.votes) ? [...opt.votes] : [];
+        if (opt.id === optionId) {
+          if (!votes.includes(currentUid)) {
+            votes.push(currentUid);
+          }
+        } else {
+          // Remove previous vote if single-choice
+          const idx = votes.indexOf(currentUid);
+          if (idx !== -1) votes.splice(idx, 1);
+        }
+        return { ...opt, votes };
+      });
+
+      const updatedPoll = { ...targetMsg.poll, options: updatedOptions };
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, poll: updatedPoll } : m))
+      );
+
+      try {
+        await supabase
+          .from("messages")
+          .update({ poll: updatedPoll })
+          .eq("id", msgId);
+      } catch (err) {
+        console.error("Poll vote update error:", err);
+      }
+    },
+    [messages, profile]
+  );
+
   const renderMessages = () => {
     const groups = groupBy(messages, (item) =>
       new Date(item.created_at || item.createdAt).toDateString()
@@ -215,6 +277,9 @@ const Messages = () => {
           handleDelete={handleDelete}
           onOpenThread={handleOpenThread}
           onToggleReaction={handleToggleReaction}
+          onVotePoll={handleVotePoll}
+          onPinMessage={onPinMessage}
+          isPinned={pinnedMessageIds.includes(msg.id)}
         />
       ));
 
@@ -238,8 +303,9 @@ const Messages = () => {
       <ThreadDrawer
         isOpen={isThreadOpen}
         onClose={() => setIsThreadOpen(false)}
-        parentMessage={activeThreadMessage}
-        roomId={chatId}
+        rootMessage={activeThreadMessage}
+        replies={activeThreadMessage ? threadReplies[activeThreadMessage.id] || [] : []}
+        onSendReply={handleSendThreadReply}
       />
     </>
   );

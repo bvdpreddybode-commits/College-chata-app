@@ -9,9 +9,10 @@ import RoomInfoBtnModal from "./RoomInfoBtnModal";
 import EditRoomBtnDrawer from "./EditRoomBtnDrawer";
 import StudyMaterialsModal from "./StudyMaterialsModal";
 import PinnedMessagesBanner from "./PinnedMessagesBanner";
+import AiStudyRoomTabs from "../AiStudyRoomTabs";
 import { useProfile } from "../../../context/profile.context";
 
-const ChatTop = () => {
+const ChatTop = ({ pinnedMessages = [], onUnpinMessage, onJumpToMessage }) => {
   const name = useCurrentRoom((v) => v.name);
   const description = useCurrentRoom((v) => v.description);
   const category = useCurrentRoom((v) => v.category);
@@ -21,6 +22,8 @@ const ChatTop = () => {
   const { profile } = useProfile();
 
   const [isStudyModalOpen, setIsStudyModalOpen] = useState(false);
+  const [isAiHubOpen, setIsAiHubOpen] = useState(false);
+  const [aiHubTab, setAiHubTab] = useState("ai");
   const isMobile = useMediaQuery("(max-width: 992px)");
 
   const isDm = type === "dm";
@@ -32,6 +35,20 @@ const ChatTop = () => {
       displayName = parts[0] === myName ? parts[1] : parts[0];
     }
   }
+
+  const openAiHub = (tab = "ai") => {
+    setAiHubTab(tab);
+    setIsAiHubOpen(true);
+  };
+
+  const defaultPins = [
+    {
+      id: "pin-welcome",
+      text: "📌 CampusConnect: Share notes, ask AI for instant explanations, and collaborate respectfully.",
+      author: { name: "Campus Hub" },
+    },
+    ...pinnedMessages,
+  ];
 
   return (
     <div>
@@ -64,31 +81,51 @@ const ChatTop = () => {
           </div>
         </div>
 
-        <ButtonToolbar className="ws-nowrap">
+        <ButtonToolbar className="ws-nowrap" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          {/* AI & Academic Hub Button */}
+          <Button
+            size="sm"
+            appearance="primary"
+            color="blue"
+            onClick={() => openAiHub("ai")}
+            style={{ fontWeight: 600 }}
+            title="Open Campus AI Assistant, Quiz Generator, Flashcards, and Cloud Simulators"
+          >
+            🤖 Study & AI Hub
+          </Button>
+
+          {/* Download Study Notes */}
           <Button
             size="sm"
             appearance="ghost"
-            color="blue"
+            color="cyan"
             onClick={() => setIsStudyModalOpen(true)}
             style={{ fontWeight: 600 }}
           >
             <FileDownloadIcon /> Study Notes
           </Button>
+
           {!isDm && <RoomInfoBtnModal />}
           {isAdmin && !isDm && <EditRoomBtnDrawer />}
         </ButtonToolbar>
       </div>
 
       <PinnedMessagesBanner
-        pinnedMessages={[
-          { id: "pin-1", text: "📌 Welcome to the official study channel! Keep discussions academic and adhere to campus guidelines." },
-        ]}
+        pinnedMessages={defaultPins}
+        onUnpin={onUnpinMessage}
+        onJumpTo={onJumpToMessage}
       />
 
       <StudyMaterialsModal
         isOpen={isStudyModalOpen}
         onClose={() => setIsStudyModalOpen(false)}
         roomName={displayName}
+      />
+
+      <AiStudyRoomTabs
+        isOpen={isAiHubOpen}
+        onClose={() => setIsAiHubOpen(false)}
+        initialTab={aiHubTab}
       />
     </div>
   );

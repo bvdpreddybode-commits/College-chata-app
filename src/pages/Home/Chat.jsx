@@ -19,6 +19,7 @@ const Chat = () => {
   const unlockRoom = roomsContext ? roomsContext.unlockRoom : () => {};
 
   const [enteredPasscode, setEnteredPasscode] = useState("");
+  const [pinnedMessages, setPinnedMessages] = useState([]);
 
   if (!rooms) {
     return <Loader center vertical size="md" content="Loading campus channel..." speed="slow" />;
@@ -59,6 +60,22 @@ const Chat = () => {
         </Message>
       );
     }
+  };
+
+  const handlePinMessage = (msg) => {
+    const isAlreadyPinned = pinnedMessages.some((p) => p.id === msg.id);
+    if (isAlreadyPinned) {
+      setPinnedMessages((prev) => prev.filter((p) => p.id !== msg.id));
+      toaster.push(<Message type="info">Message unpinned from channel header.</Message>);
+    } else {
+      setPinnedMessages((prev) => [...prev, msg]);
+      toaster.push(<Message type="success">Message pinned to channel header!</Message>);
+    }
+  };
+
+  const handleUnpinMessage = (msgId) => {
+    setPinnedMessages((prev) => prev.filter((p) => p.id !== msgId));
+    toaster.push(<Message type="info">Message unpinned.</Message>);
   };
 
   if (isLocked) {
@@ -113,11 +130,17 @@ const Chat = () => {
   return (
     <CurrentRoomProvider data={currentRoomData}>
       <div className="chat-top">
-        <ChatTop />
+        <ChatTop
+          pinnedMessages={pinnedMessages}
+          onUnpinMessage={handleUnpinMessage}
+        />
       </div>
 
       <div className="chat-middle">
-        <Messages />
+        <Messages
+          onPinMessage={handlePinMessage}
+          pinnedMessageIds={pinnedMessages.map((p) => p.id)}
+        />
       </div>
 
       <div className="chat-bottom">

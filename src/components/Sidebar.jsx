@@ -5,6 +5,7 @@ import CreateRoomBtnModal from "./CreateRoomBtnModal";
 import DashboardToggle from "./dashboard/DashboardToggle";
 import ChatRoomList from "./rooms/ChatRoomList";
 import StartDmModal from "./direct_messages/StartDmModal";
+import AiStudyRoomTabs from "./chat_window/AiStudyRoomTabs";
 import { useProfile } from "../context/profile.context";
 
 const Sidebar = () => {
@@ -12,6 +13,7 @@ const Sidebar = () => {
   const [height, setHeight] = useState(0);
   const [activeTab, setActiveTab] = useState("channels"); // 'channels' | 'dms'
   const [isDmModalOpen, setIsDmModalOpen] = useState(false);
+  const [isAiHubOpen, setIsAiHubOpen] = useState(false);
   const { profile } = useProfile();
 
   useEffect(() => {
@@ -69,6 +71,18 @@ const Sidebar = () => {
           </div>
         </div>
 
+        <div className="mb-2">
+          <Button
+            block
+            appearance="ghost"
+            color="blue"
+            onClick={() => setIsAiHubOpen(true)}
+            style={{ fontWeight: 700, fontSize: "12px", padding: "6px 10px" }}
+          >
+            🤖 AI Study Buddy & Cloud Hub
+          </Button>
+        </div>
+
         <Nav
           appearance="subtle"
           activeKey={activeTab}
@@ -91,9 +105,13 @@ const Sidebar = () => {
         isOpen={isDmModalOpen}
         onClose={() => setIsDmModalOpen(false)}
       />
+
+      <AiStudyRoomTabs
+        isOpen={isAiHubOpen}
+        onClose={() => setIsAiHubOpen(false)}
+      />
     </div>
   );
 };
 
 export default Sidebar;
-

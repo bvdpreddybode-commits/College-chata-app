@@ -1,46 +1,148 @@
 import React from "react";
 import { Dropdown, Popover, Whisper } from "rsuite";
+import MoreIcon from "@rsuite/icons/legacy/EllipsisH";
+import PinIcon from "@rsuite/icons/legacy/ThumbTack";
+import TrashIcon from "@rsuite/icons/legacy/Trash";
+import CopyIcon from "@rsuite/icons/Copy";
+import { EMOJI_OPTIONS } from "./ReactionsBar";
 
-const MENU_ITEMS = [
-  { key: "reply", icon: "💬", label: "Reply in Thread" },
-  { key: "react", icon: "😊", label: "Add Reaction" },
-  { key: "edit", icon: "✏️", label: "Edit Message" },
-  { key: "copy", icon: "📋", label: "Copy Text" },
-  { key: "pin", icon: "📌", label: "Pin Message" },
-  { key: "save", icon: "🔖", label: "Save / Bookmark" },
-  { key: "forward", icon: "↗️", label: "Forward to Channel" },
-  { key: "report", icon: "🚩", label: "Report Message" },
-  { key: "delete", icon: "🗑️", label: "Delete Message", danger: true },
-];
-
-const MessageContextMenu = ({ message, isAuthor, isAdmin, onAction, children }) => {
-  const visibleItems = MENU_ITEMS.filter((item) => {
-    if (item.key === "edit" && !isAuthor) return false;
-    if (item.key === "delete" && !isAuthor && !isAdmin) return false;
-    return true;
-  });
-
-  const speaker = (
-    <Popover full style={{ width: 200, padding: 0 }}>
-      <Dropdown.Menu>
-        {visibleItems.map((item) => (
-          <Dropdown.Item
-            key={item.key}
-            onClick={() => onAction(item.key, message)}
-            style={item.danger ? { color: "#ef4444" } : undefined}
+const MessageContextMenu = ({
+  message,
+  isAuthor,
+  isAdmin,
+  isPinned,
+  onToggleReaction,
+  onPinMessage,
+  onOpenThread,
+  onDeleteMessage,
+  onCopyText,
+}) => {
+  const emojiSpeaker = (
+    <Popover full style={{ padding: "6px 8px" }}>
+      <div className="d-flex gap-1" style={{ gap: "6px" }}>
+        {EMOJI_OPTIONS.map(({ emoji, label }) => (
+          <button
+            key={emoji}
+            type="button"
+            title={label}
+            onClick={() => onToggleReaction(emoji)}
+            style={{
+              background: "transparent",
+              border: "none",
+              fontSize: "18px",
+              cursor: "pointer",
+              padding: "4px",
+              borderRadius: "4px",
+              transition: "transform 0.1s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.25)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
-            <span style={{ marginRight: "8px" }}>{item.icon}</span>
-            {item.label}
-          </Dropdown.Item>
+            {emoji}
+          </button>
         ))}
-      </Dropdown.Menu>
+      </div>
     </Popover>
   );
 
   return (
-    <Whisper placement="autoVerticalEnd" trigger="click" speaker={speaker}>
-      {children}
-    </Whisper>
+    <div className="d-inline-flex align-items-center gap-1" style={{ gap: "4px" }}>
+      {/* Quick Reaction Trigger */}
+      <Whisper placement="top" trigger="click" speaker={emojiSpeaker}>
+        <button
+          type="button"
+          title="Add Reaction"
+          style={{
+            background: "rgba(255,255,255,0.85)",
+            border: "1px solid #cbd5e1",
+            borderRadius: "50%",
+            width: "24px",
+            height: "24px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            fontSize: "12px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          😀
+        </button>
+      </Whisper>
+
+      {/* Reply in Thread Button */}
+      {onOpenThread && (
+        <button
+          type="button"
+          title="Reply in Thread"
+          onClick={() => onOpenThread(message)}
+          style={{
+            background: "rgba(255,255,255,0.85)",
+            border: "1px solid #cbd5e1",
+            borderRadius: "50%",
+            width: "24px",
+            height: "24px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            fontSize: "12px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          💬
+        </button>
+      )}
+
+      {/* Options Dropdown */}
+      <Dropdown
+        renderToggle={(props, ref) => (
+          <button
+            {...props}
+            ref={ref}
+            type="button"
+            style={{
+              background: "rgba(255,255,255,0.85)",
+              border: "1px solid #cbd5e1",
+              borderRadius: "50%",
+              width: "24px",
+              height: "24px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: "11px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            }}
+          >
+            <MoreIcon />
+          </button>
+        )}
+        placement="bottomEnd"
+      >
+        {message.text && (
+          <Dropdown.Item onClick={() => onCopyText(message.text)}>
+            <CopyIcon /> Copy Message Text
+          </Dropdown.Item>
+        )}
+        {onPinMessage && (
+          <Dropdown.Item onClick={() => onPinMessage(message)}>
+            <PinIcon /> {isPinned ? "Unpin from Channel" : "Pin to Channel Header"}
+          </Dropdown.Item>
+        )}
+        {(isAuthor || isAdmin) && onDeleteMessage && (
+          <>
+            <Dropdown.Separator />
+            <Dropdown.Item
+              onClick={() => onDeleteMessage(message.id, message.file)}
+              style={{ color: "#ef4444" }}
+            >
+              <TrashIcon /> Delete Message
+            </Dropdown.Item>
+          </>
+        )}
+      </Dropdown>
+    </div>
   );
 };
 

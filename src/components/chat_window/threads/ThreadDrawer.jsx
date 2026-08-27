@@ -1,143 +1,126 @@
 import React, { useState } from "react";
-import { Drawer, Input, InputGroup, List, Message, toaster } from "rsuite";
+import { Drawer, Input, InputGroup } from "rsuite";
 import SendIcon from "@rsuite/icons/Send";
 import TimeAgo from "timeago-react";
-import { useProfile } from "../../../context/profile.context";
 import ProfileAvatar from "../../ProfileAvatar";
 
-const ThreadDrawer = ({ isOpen, onClose, parentMessage, roomId }) => {
-  const { profile } = useProfile();
-  const [replies, setReplies] = useState([
-    {
-      id: "thread-demo-1",
-      text: "Great question! I think the answer involves normalization to BCNF first.",
-      author: { name: "Priya Sharma", role: "Student", department: "Computer Science" },
-      created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    },
-    {
-      id: "thread-demo-2",
-      text: "Agreed, also don't forget about the functional dependency closure algorithm.",
-      author: { name: "Ravi Kumar", role: "Teaching Assistant", department: "Computer Science" },
-      created_at: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-    },
-  ]);
-  const [replyInput, setReplyInput] = useState("");
+const ThreadDrawer = ({ isOpen, onClose, rootMessage, replies = [], onSendReply }) => {
+  const [replyText, setReplyText] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
-  const handleSendReply = () => {
-    if (!replyInput.trim()) return;
-    const newReply = {
-      id: "thread-" + Date.now(),
-      text: replyInput.trim(),
-      author: {
-        name: profile?.name || "Student",
-        role: profile?.role || "Student",
-        department: profile?.department || "Computer Science",
-        avatar: profile?.avatar,
-      },
-      created_at: new Date().toISOString(),
-    };
-    setReplies((prev) => [...prev, newReply]);
-    setReplyInput("");
-    toaster.push(
-      <Message type="info" closable duration={3000}>
-        Reply posted in thread
-      </Message>
-    );
+  if (!rootMessage) return null;
+
+  const handleSend = async () => {
+    if (!replyText.trim() || isSending) return;
+    setIsSending(true);
+    try {
+      if (onSendReply) {
+        await onSendReply(rootMessage.id, replyText.trim());
+      }
+      setReplyText("");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
-    <Drawer size="sm" open={isOpen} onClose={onClose} placement="right">
+    <Drawer open={isOpen} onClose={onClose} placement="right" size="sm">
       <Drawer.Header>
-        <Drawer.Title>💬 Thread — {replies.length} Replies</Drawer.Title>
+        <Drawer.Title>💬 Thread Discussion</Drawer.Title>
       </Drawer.Header>
-      <Drawer.Body style={{ padding: "16px", display: "flex", flexDirection: "column" }}>
-        {/* Parent Message */}
-        {parentMessage && (
-          <div
-            style={{
-              padding: "12px 14px",
-              background: "var(--bg-surface-subtle)",
-              borderRadius: "10px",
-              borderLeft: "4px solid var(--brand-primary)",
-              marginBottom: "16px",
-            }}
-          >
-            <div className="d-flex align-items-center gap-2 mb-1">
-              <ProfileAvatar
-                src={parentMessage.author?.avatar}
-                name={parentMessage.author?.name || "Student"}
-                size="xs"
-              />
-              <strong style={{ fontSize: "13px" }}>
-                {parentMessage.isAnonymous
-                  ? "🕵️ Anonymous Student"
-                  : parentMessage.author?.name || "Student"}
-              </strong>
-              <TimeAgo
-                datetime={parentMessage.created_at || parentMessage.createdAt}
-                style={{ fontSize: "11px", color: "var(--text-muted)" }}
-              />
-            </div>
-            <div style={{ fontSize: "14px", color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>
-              {parentMessage.text}
-            </div>
+      <Drawer.Body style={{ display: "flex", flexDirection: "column", padding: "16px" }}>
+        {/* Root Message Preview */}
+        <div
+          style={{
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: "8px",
+            padding: "12px",
+            marginBottom: "16px",
+          }}
+        >
+          <div className="d-flex align-items-center mb-1">
+            <ProfileAvatar
+              src={rootMessage.author?.avatar}
+              name={rootMessage.author?.name || "Student"}
+              size="xs"
+              className="mr-2"
+            />
+            <strong style={{ fontSize: "13px", color: "#0f172a" }}>
+              {rootMessage.author?.name || "Student"}
+            </strong>
+            <TimeAgo
+              datetime={rootMessage.created_at || rootMessage.createdAt}
+              className="font-normal text-muted ml-2"
+              style={{ fontSize: "11px" }}
+            />
           </div>
-        )}
+          <div style={{ fontSize: "13px", color: "#334155", marginLeft: "28px" }}>
+            {rootMessage.text}
+          </div>
+        </div>
 
-        {/* Thread Replies */}
-        <div style={{ flex: 1, overflowY: "auto" }} className="custom-scroll">
-          <List hover>
-            {replies.map((reply) => (
-              <List.Item key={reply.id} style={{ padding: "10px 12px" }}>
-                <div className="d-flex align-items-center gap-2 mb-1">
+        <div style={{ fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "8px" }}>
+          Replies ({replies.length})
+        </div>
+
+        {/* Replies List */}
+        <div style={{ flex: 1, overflowY: "auto", marginBottom: "16px" }} className="custom-scroll">
+          {replies.length === 0 ? (
+            <div className="text-center text-muted p-4" style={{ fontSize: "13px" }}>
+              No replies yet. Start the thread conversation below!
+            </div>
+          ) : (
+            replies.map((reply, idx) => (
+              <div
+                key={reply.id || idx}
+                style={{
+                  padding: "8px 10px",
+                  borderBottom: "1px solid #f1f5f9",
+                  marginBottom: "4px",
+                }}
+              >
+                <div className="d-flex align-items-center mb-1">
                   <ProfileAvatar
                     src={reply.author?.avatar}
                     name={reply.author?.name || "Student"}
                     size="xs"
+                    className="mr-2"
                   />
-                  <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>
-                    {reply.author?.name}
+                  <strong style={{ fontSize: "12px", color: "#1e293b" }}>
+                    {reply.author?.name || "Student"}
                   </strong>
-                  {reply.author?.role === "Teaching Assistant" && (
-                    <span className="badge-pill badge-ta">📘 TA</span>
-                  )}
-                  {reply.author?.role === "Faculty" && (
-                    <span className="badge-pill badge-faculty">👨‍🏫 Faculty</span>
-                  )}
                   <TimeAgo
-                    datetime={reply.created_at}
-                    style={{ fontSize: "11px", color: "var(--text-muted)" }}
+                    datetime={reply.created_at || reply.createdAt}
+                    className="font-normal text-muted ml-2"
+                    style={{ fontSize: "10px" }}
                   />
                 </div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "var(--text-secondary)",
-                    marginLeft: "28px",
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
+                <div style={{ fontSize: "13px", color: "#334155", marginLeft: "28px" }}>
                   {reply.text}
                 </div>
-              </List.Item>
-            ))}
-          </List>
+              </div>
+            ))
+          )}
         </div>
 
-        {/* Reply Input */}
-        <div style={{ marginTop: "12px", borderTop: "1px solid var(--border-subtle)", paddingTop: "12px" }}>
-          <InputGroup>
-            <Input
-              placeholder="Reply in this thread..."
-              value={replyInput}
-              onChange={setReplyInput}
-              onKeyDown={(e) => e.keyCode === 13 && handleSendReply()}
-            />
-            <InputGroup.Button color="blue" appearance="primary" onClick={handleSendReply}>
-              <SendIcon />
-            </InputGroup.Button>
-          </InputGroup>
-        </div>
+        {/* Input Bar */}
+        <InputGroup>
+          <Input
+            placeholder="Reply to this thread..."
+            value={replyText}
+            onChange={setReplyText}
+            onKeyDown={(e) => e.keyCode === 13 && handleSend()}
+          />
+          <InputGroup.Button
+            color="blue"
+            appearance="primary"
+            onClick={handleSend}
+            disabled={isSending || !replyText.trim()}
+          >
+            <SendIcon />
+          </InputGroup.Button>
+        </InputGroup>
       </Drawer.Body>
     </Drawer>
   );
