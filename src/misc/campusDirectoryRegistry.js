@@ -1,119 +1,7 @@
 import { supabase } from "./supabaseClient";
 
-export const DEFAULT_CAMPUS_DIRECTORY = [
-  {
-    uid: "peer-priya-01",
-    id: "peer-priya-01",
-    name: "Priya Sharma",
-    email: "priya.s@vnrvjiet.in",
-    department: "Computer Science & Engineering",
-    rollNo: "21241A0545",
-    roll_no: "21241A0545",
-    batch: "3rd Year",
-    role: "Student",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Priya",
-    status: "online",
-    bio: "AI & Fullstack enthusiast. 3rd year CSE.",
-  },
-  {
-    uid: "peer-ravi-02",
-    id: "peer-ravi-02",
-    name: "Ravi Kumar",
-    email: "ravi.k@vnrvjiet.in",
-    department: "Information Technology",
-    rollNo: "21241A1208",
-    roll_no: "21241A1208",
-    batch: "3rd Year",
-    role: "Teaching Assistant",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ravi",
-    status: "online",
-    bio: "Teaching Assistant for Cloud & Operating Systems.",
-  },
-  {
-    uid: "peer-rao-03",
-    id: "peer-rao-03",
-    name: "Dr. K. V. Rao",
-    email: "kv_rao@vnrvjiet.in",
-    department: "Computer Science & Engineering",
-    rollNo: "FAC-CSE-012",
-    roll_no: "FAC-CSE-012",
-    batch: "Faculty",
-    role: "Faculty",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=DrRao",
-    status: "online",
-    bio: "Associate Professor, Department of Computer Science.",
-  },
-  {
-    uid: "peer-sneha-04",
-    id: "peer-sneha-04",
-    name: "Sneha Reddy",
-    email: "sneha.r@vnrvjiet.in",
-    department: "Electronics & Communication",
-    rollNo: "22241A0419",
-    roll_no: "22241A0419",
-    batch: "2nd Year",
-    role: "Student",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sneha",
-    status: "online",
-    bio: "ECE student exploring IoT, embedded systems, and robotics.",
-  },
-  {
-    uid: "peer-arjun-05",
-    id: "peer-arjun-05",
-    name: "Arjun Patel",
-    email: "arjun.p@vnrvjiet.in",
-    department: "Computer Science & Engineering",
-    rollNo: "21241A0512",
-    roll_no: "21241A0512",
-    batch: "3rd Year",
-    role: "Student",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Arjun",
-    status: "online",
-    bio: "Competitive programmer & Open Source contributor.",
-  },
-  {
-    uid: "peer-meera-06",
-    id: "peer-meera-06",
-    name: "Meera Joshi",
-    email: "meera.j@vnrvjiet.in",
-    department: "Mechanical Engineering",
-    rollNo: "22241A0318",
-    roll_no: "22241A0318",
-    batch: "2nd Year",
-    role: "Student",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Meera",
-    status: "away",
-    bio: "Mechanical engineering student interested in CAD & Robotics.",
-  },
-  {
-    uid: "peer-vikram-07",
-    id: "peer-vikram-07",
-    name: "Vikram Singh",
-    email: "vikram.s@vnrvjiet.in",
-    department: "Information Technology",
-    rollNo: "21241A1245",
-    roll_no: "21241A1245",
-    batch: "3rd Year",
-    role: "Student",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Vikram",
-    status: "online",
-    bio: "DevOps & Cloud architecture learner.",
-  },
-  {
-    uid: "peer-ananya-08",
-    id: "peer-ananya-08",
-    name: "Ananya Rao",
-    email: "ananya.r@vnrvjiet.in",
-    department: "Computer Science & Engineering",
-    rollNo: "22241A0501",
-    roll_no: "22241A0501",
-    batch: "2nd Year",
-    role: "Student",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ananya",
-    status: "online",
-    bio: "Web developer & UI/UX designer.",
-  },
-];
+// No hardcoded dummy members — only real registered campus students and faculty
+export const DEFAULT_CAMPUS_DIRECTORY = [];
 
 /**
  * Registers / upserts any entering student or faculty member into both:
@@ -125,6 +13,9 @@ export async function registerCampusStudent(student) {
 
   const uid = student.uid || student.id;
   if (!uid) return;
+
+  // Do not register generic demo accounts as real campus students
+  if (uid.startsWith("demo-")) return;
 
   const formatted = {
     id: uid,
@@ -149,7 +40,17 @@ export async function registerCampusStudent(student) {
     let list = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(list)) list = [];
 
-    const existingIdx = list.findIndex((u) => u.id === uid || u.uid === uid || (u.email && u.email === formatted.email));
+    // Filter out any past dummy peers
+    list = list.filter(
+      (u) =>
+        !u.id?.startsWith("peer-") &&
+        !u.uid?.startsWith("peer-") &&
+        !u.id?.startsWith("demo-")
+    );
+
+    const existingIdx = list.findIndex(
+      (u) => u.id === uid || u.uid === uid || (u.email && u.email === formatted.email)
+    );
     if (existingIdx >= 0) {
       list[existingIdx] = { ...list[existingIdx], ...formatted, status: "online" };
     } else {
@@ -169,57 +70,32 @@ export async function registerCampusStudent(student) {
 }
 
 /**
- * Loads all registered campus students combining:
- * - Supabase `profiles`
+ * Loads all real registered campus students from:
+ * - Supabase `profiles` database
  * - Locally cached registered students
- * - Default campus directory peers
  */
 export async function fetchAllCampusMembers(currentUid) {
   const memberMap = new Map();
 
-  // 1. Seed with default directory
-  DEFAULT_CAMPUS_DIRECTORY.forEach((u) => {
-    memberMap.set(u.uid || u.id, {
-      ...u,
-      uid: u.uid || u.id,
-      rollNo: u.rollNo || u.roll_no,
-    });
-  });
-
-  // 2. Merge with localStorage registered students
+  // 1. Fetch live Supabase database profiles (real registered students)
   try {
-    const raw = localStorage.getItem("campus_registered_students");
-    if (raw) {
-      const localList = JSON.parse(raw);
-      if (Array.isArray(localList)) {
-        localList.forEach((u) => {
-          const id = u.uid || u.id;
-          if (id) {
-            memberMap.set(id, {
-              ...u,
-              uid: id,
-              rollNo: u.rollNo || u.roll_no,
-            });
-          }
-        });
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-  // 3. Merge with live Supabase database profiles
-  try {
-    const { data } = await supabase.from("profiles").select("*").limit(100);
     if (data && Array.isArray(data)) {
       data.forEach((u) => {
-        if (u.id) {
+        if (u.id && !u.id.startsWith("peer-") && !u.id.startsWith("demo-")) {
           memberMap.set(u.id, {
             uid: u.id,
             id: u.id,
             name: u.name || "Student",
             email: u.email,
-            avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.name || u.id)}`,
+            avatar:
+              u.avatar ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.name || u.id)}`,
             rollNo: u.roll_no || "",
             roll_no: u.roll_no || "",
             department: u.department || "General",
@@ -235,10 +111,37 @@ export async function fetchAllCampusMembers(currentUid) {
     console.warn("Supabase fetch profiles notice:", e);
   }
 
-  // 4. Exclude current logged in user
-  const allMembers = Array.from(memberMap.values()).filter((u) => u.uid !== currentUid && u.id !== currentUid);
+  // 2. Merge with localStorage registered students
+  try {
+    const raw = localStorage.getItem("campus_registered_students");
+    if (raw) {
+      const localList = JSON.parse(raw);
+      if (Array.isArray(localList)) {
+        localList.forEach((u) => {
+          const id = u.uid || u.id;
+          if (id && !id.startsWith("peer-") && !id.startsWith("demo-")) {
+            if (!memberMap.has(id)) {
+              memberMap.set(id, {
+                ...u,
+                uid: id,
+                id: id,
+                rollNo: u.rollNo || u.roll_no,
+              });
+            }
+          }
+        });
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
 
-  // 5. Sort: Online members & students first
+  // 3. Exclude current logged in user
+  const allMembers = Array.from(memberMap.values()).filter(
+    (u) => u.uid !== currentUid && u.id !== currentUid
+  );
+
+  // 4. Sort: Online members & students first
   allMembers.sort((a, b) => {
     if (a.status === "online" && b.status !== "online") return -1;
     if (a.status !== "online" && b.status === "online") return 1;

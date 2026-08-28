@@ -163,10 +163,13 @@ const StartDmModal = ({ isOpen, onClose }) => {
         {loading && <Loader center content="Searching campus directory…" style={{ padding: "30px 0" }} />}
 
         {!loading && filteredUsers.length === 0 && (
-          <div style={{ textAlign: "center", padding: "30px 0", color: "var(--text-muted)" }}>
-            <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
-            <p style={{ fontSize: "13px" }}>
-              {search ? "No students match your search." : "No campus members found."}
+          <div style={{ textAlign: "center", padding: "30px 20px", color: "var(--text-muted)" }}>
+            <div style={{ fontSize: "32px", marginBottom: "8px" }}>👥</div>
+            <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
+              {search ? "No students match your search." : "No other students registered yet."}
+            </p>
+            <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+              As classmates register or sign in with their university ID, they will appear here automatically for private direct messaging.
             </p>
           </div>
         )}
