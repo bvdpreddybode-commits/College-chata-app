@@ -6,6 +6,7 @@ import { supabase } from "../../misc/supabaseClient";
 import { useProfile } from "../../context/profile.context";
 import ProfileAvatar from "../ProfileAvatar";
 import { fetchAllCampusMembers } from "../../misc/campusDirectoryRegistry";
+import { useRoomsContext } from "../../context/rooms.context";
 
 const STATUS_CONFIG = {
   online: { color: "#10b981", label: "Online", dot: "●" },
@@ -20,6 +21,7 @@ const StartDmModal = ({ isOpen, onClose }) => {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const history = useHistory();
   const { profile } = useProfile();
+  const { addRoomOptimistic, fetchRooms } = useRoomsContext() || {};
 
   useEffect(() => {
     if (!isOpen) return;
@@ -44,18 +46,18 @@ const StartDmModal = ({ isOpen, onClose }) => {
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      const term = search.toLowerCase();
-      const textMatch =
-        (u.name || "").toLowerCase().includes(term) ||
-        (u.department || "").toLowerCase().includes(term) ||
-        (u.rollNo || "").toLowerCase().includes(term) ||
-        (u.role || "").toLowerCase().includes(term);
+      const matchSearch =
+        !search.trim() ||
+        u.name?.toLowerCase().includes(search.toLowerCase()) ||
+        u.department?.toLowerCase().includes(search.toLowerCase()) ||
+        u.roll_no?.toLowerCase().includes(search.toLowerCase()) ||
+        u.rollNo?.toLowerCase().includes(search.toLowerCase());
 
-      if (!textMatch) return false;
+      if (!matchSearch) return false;
 
       if (selectedFilter === "online") return u.status === "online";
       if (selectedFilter === "students") return u.role === "Student";
-      if (selectedFilter === "faculty") return u.role === "Faculty" || u.role === "Teaching Assistant";
+      if (selectedFilter === "faculty") return u.role === "Faculty" || u.isAdmin;
       return true;
     });
   }, [users, search, selectedFilter]);
@@ -66,38 +68,35 @@ const StartDmModal = ({ isOpen, onClose }) => {
     const currentUid = profile?.uid || profile?.id;
     if (!currentUid) return;
 
-    const peerUid = targetUser.uid;
+    const peerUid = targetUser.uid || targetUser.id;
     const dmId = ["dm", currentUid, peerUid].sort().join("_");
 
+    const cleanDmData = {
+      id: dmId,
+      name: `${targetUser.name} & ${profile?.name || "Peer"}`,
+      description: "Private 1-on-1 Direct Message",
+      created_at: new Date().toISOString(),
+      created_by: currentUid,
+      is_dm: true,
+      members: [currentUid, peerUid],
+      admins: { [currentUid]: true, [peerUid]: true },
+    };
+
     try {
-      const { data: existingRoom } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("id", dmId)
-        .single();
-
-      if (!existingRoom) {
-        await supabase.from("rooms").insert({
-          id: dmId,
-          name: `${targetUser.name} & ${profile?.name || "Peer"}`,
-          description: "Private 1-on-1 Direct Message",
-          created_at: new Date().toISOString(),
-          created_by: currentUid,
-          is_dm: true,
-          type: "dm",
-          isPrivate: true,
-          members: [currentUid, peerUid],
-          admins: { [currentUid]: true, [peerUid]: true },
-        });
-      }
-
-      onClose();
-      history.push(`/chat/${dmId}`);
+      await supabase.from("rooms").upsert(cleanDmData);
     } catch (err) {
-      console.error("Error starting direct message:", err);
-      onClose();
-      history.push(`/chat/${dmId}`);
+      console.warn("Notice: DM room local sync:", err);
     }
+
+    if (addRoomOptimistic) {
+      addRoomOptimistic(cleanDmData);
+    }
+    if (fetchRooms) {
+      fetchRooms();
+    }
+
+    onClose();
+    history.push(`/chat/${dmId}`);
   };
 
   const filters = [

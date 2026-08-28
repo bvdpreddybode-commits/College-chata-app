@@ -22,6 +22,17 @@ const Messages = ({ onPinMessage, pinnedMessageIds = [] }) => {
   const canShowMessages = messages && messages.length > 0;
 
   const fetchMessages = useCallback(async () => {
+    // 1. Instantly display cached messages for this room
+    try {
+      const cached = localStorage.getItem("campus_messages_" + chatId);
+      if (cached) {
+        setMessages(JSON.parse(cached));
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // 2. Fetch latest messages from Supabase
     try {
       const { data, error } = await supabase
         .from("messages")
@@ -30,9 +41,19 @@ const Messages = ({ onPinMessage, pinnedMessageIds = [] }) => {
         .order("created_at", { ascending: true })
         .limit(PAGE_SIZE);
 
-      if (error) throw error;
-      if (data) {
-        setMessages(data);
+      if (!error && data) {
+        setMessages((prev) => {
+          const map = new Map();
+          (prev || []).forEach((m) => map.set(m.id, m));
+          data.forEach((m) => map.set(m.id, m));
+          const merged = Array.from(map.values()).sort(
+            (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0)
+          );
+          try {
+            localStorage.setItem("campus_messages_" + chatId, JSON.stringify(merged));
+          } catch (err) {}
+          return merged;
+        });
       }
     } catch (err) {
       console.error("Error fetching messages:", err);
@@ -41,6 +62,17 @@ const Messages = ({ onPinMessage, pinnedMessageIds = [] }) => {
 
   useEffect(() => {
     fetchMessages();
+
+    // Listen to optimistic local messages
+    const handleOptimisticMsg = (e) => {
+      if (e.detail) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === e.detail.id)) return prev;
+          return [...prev, e.detail];
+        });
+      }
+    };
+    window.addEventListener("campus_new_message_" + chatId, handleOptimisticMsg);
 
     // Subscribe to realtime messages in this room
     const channel = supabase
@@ -60,6 +92,7 @@ const Messages = ({ onPinMessage, pinnedMessageIds = [] }) => {
       .subscribe();
 
     return () => {
+      window.removeEventListener("campus_new_message_" + chatId, handleOptimisticMsg);
       supabase.removeChannel(channel);
     };
   }, [chatId, fetchMessages]);

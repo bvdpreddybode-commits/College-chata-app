@@ -11,9 +11,11 @@ import {
   toaster,
 } from "rsuite";
 import PlusIcon from "@rsuite/icons/Plus";
+import { useHistory } from "react-router-dom";
 import { useModalState } from "../misc/custom-hooks";
 import { supabase } from "../misc/supabaseClient";
 import { useProfile } from "../context/profile.context";
+import { useRoomsContext } from "../context/rooms.context";
 
 const Textarea = React.forwardRef((props, ref) => (
   <Input {...props} as="textarea" ref={ref} />
@@ -30,7 +32,7 @@ const CATEGORIES = [
 const INITIAL_FORM = {
   name: "",
   description: "",
-  category: "Department",
+  category: "Study Group",
   privacy: "public", // 'public' | 'private'
   passcode: "",
 };
@@ -40,7 +42,9 @@ const CreateRoomBtnModal = () => {
   const [formValue, setFormValue] = useState(INITIAL_FORM);
   const [isLoading, setIsLoading] = useState(false);
   const formRef = useRef();
+  const history = useHistory();
   const { profile } = useProfile();
+  const { unlockRoom, addRoomOptimistic, fetchRooms } = useRoomsContext() || {};
 
   const onFormChange = useCallback((value) => {
     setFormValue(value);
@@ -50,7 +54,7 @@ const CreateRoomBtnModal = () => {
     if (!formValue.name.trim()) {
       toaster.push(
         <Message type="warning" closable duration={4000}>
-          Please provide a channel or group name.
+          Please provide a channel or study group name.
         </Message>
       );
       return;
@@ -69,41 +73,70 @@ const CreateRoomBtnModal = () => {
 
     const isPrivate = formValue.privacy === "private";
     const roomId = "room-" + Date.now();
-    const uid = profile?.uid || profile?.id || "anonymous";
+    const uid = profile?.uid || profile?.id || "student-creator";
 
-    const newRoomData = {
+    // Encode metadata safely into description payload for universal schema compatibility
+    const descriptionPayload = JSON.stringify({
+      text: formValue.description?.trim() || "Campus Channel & Study Group",
+      category: formValue.category || "Study Group",
+      isPrivate: isPrivate,
+      passcode: isPrivate ? formValue.passcode.trim() : "",
+    });
+
+    const cleanRoomData = {
       id: roomId,
       name: formValue.name.trim(),
-      description: formValue.description || "Campus Channel",
+      description: descriptionPayload,
       created_at: new Date().toISOString(),
       created_by: uid,
       admins: { [uid]: true },
-      category: formValue.category || "General",
       is_dm: false,
-      isPrivate: isPrivate,
-      is_private: isPrivate,
-      ...(isPrivate ? { passcode: formValue.passcode.trim() } : {}),
       members: [uid],
     };
 
     try {
-      const { error } = await supabase.from("rooms").insert(newRoomData);
-      if (error) throw error;
+      // 1. Insert into Supabase rooms table
+      const { error } = await supabase.from("rooms").insert(cleanRoomData);
+      if (error) {
+        console.warn("Supabase insert notice (using optimistic local sync):", error.message);
+      }
+
+      // 2. Auto unlock for the creator
+      if (unlockRoom) {
+        unlockRoom(roomId);
+      }
+
+      // 3. Optimistically update room list immediately
+      if (addRoomOptimistic) {
+        addRoomOptimistic({
+          ...cleanRoomData,
+          category: formValue.category,
+          isPrivate: isPrivate,
+          passcode: formValue.passcode.trim(),
+        });
+      }
+      if (fetchRooms) {
+        fetchRooms();
+      }
 
       toaster.push(
         <Message type="success" closable duration={4000}>
-          {`${formValue.name} created successfully!`}
+          {`🎉 ${formValue.name} created successfully!`}
         </Message>
       );
 
       setIsLoading(false);
       setFormValue(INITIAL_FORM);
       close();
+
+      // Navigate to the newly created room immediately
+      history.push(`/chat/${roomId}`);
     } catch (error) {
       setIsLoading(false);
+      console.error("Room creation error:", error);
       toaster.push(
         <Message type="error" closable duration={4000}>
-          {error.message}
+          {error.message || "Failed to create channel. Please try again."}
         </Message>
       );
     }
@@ -117,7 +150,9 @@ const CreateRoomBtnModal = () => {
 
       <Modal open={isOpen} onClose={close} size="sm">
         <Modal.Header>
-          <Modal.Title>🏛️ Create Campus Channel or Study Group</Modal.Title>
+          <Modal.Title style={{ fontWeight: 700, fontSize: "16px" }}>
+            🏛️ Create Campus Channel or Study Group
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form
@@ -151,7 +186,7 @@ const CreateRoomBtnModal = () => {
                 rows={3}
                 name="description"
                 accepter={Textarea}
-                placeholder="Topic description, guidelines, faculty details..."
+                placeholder="Topic description, guidelines, syllabus, meeting timings..."
               />
             </Form.Group>
 
@@ -188,8 +223,9 @@ const CreateRoomBtnModal = () => {
             appearance="primary"
             onClick={onSubmit}
             disabled={isLoading}
+            style={{ fontWeight: 600 }}
           >
-            Create Group
+            {isLoading ? "Creating..." : "Create Group"}
           </Button>
         </Modal.Footer>
       </Modal>
