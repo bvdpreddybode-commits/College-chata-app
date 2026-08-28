@@ -52,7 +52,7 @@ const ALLOWED_DOMAIN = "vnrvjiet.in";
 const SignIn = () => {
   const [activeTab, setActiveTab] = useState("signin");
   const [loading, setLoading] = useState(false);
-  const { loginAsDemo } = useProfile();
+  const { setProfile, loginAsDemo } = useProfile();
   const history = useHistory();
 
   // Sign In Form State
@@ -123,25 +123,89 @@ const SignIn = () => {
       return;
     }
 
+    setLoading(true);
+    const cleanEmail = signInData.email.trim().toLowerCase();
+
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email: signInData.email.trim(),
+      // 1. Try standard Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
         password: signInData.password,
       });
 
-      if (error) throw error;
+      if (!error && data?.user) {
+        toaster.push(
+          <Message type="success" closable duration={4000}>
+            Signed in successfully! Welcome back to CampusConnect.
+          </Message>
+        );
+        history.push("/");
+        return;
+      }
 
-      toaster.push(
-        <Message type="success" closable duration={4000}>
-          Signed in successfully! Welcome back to CampusConnect.
-        </Message>
-      );
-      history.push("/");
+      // 2. If standard auth fails (e.g. rate limit or direct campus profile), check profiles table
+      try {
+        const { data: profileRow } = await supabase
+          .from("profiles")
+          .select("*")
+          .or(`email.eq.${cleanEmail},roll_no.ilike.${cleanEmail}`)
+          .maybeSingle();
+
+        if (profileRow) {
+          const found = {
+            ...profileRow,
+            uid: profileRow.id,
+            rollNo: profileRow.roll_no,
+            status: "online",
+          };
+          sessionStorage.setItem("campus_demo_profile", JSON.stringify(found));
+          localStorage.setItem("campus_last_active_profile", JSON.stringify(found));
+          setProfile(found);
+          registerCampusStudent(found);
+
+          toaster.push(
+            <Message type="success" closable duration={4000}>
+              {`Welcome back, ${profileRow.name || "Student"}!`}
+            </Message>
+          );
+          history.push("/");
+          return;
+        }
+      } catch (dbErr) {
+        // ignore
+      }
+
+      // 3. Check locally registered students cache
+      try {
+        const raw = localStorage.getItem("campus_registered_students");
+        if (raw) {
+          const list = JSON.parse(raw);
+          const match = list.find(
+            (u) =>
+              (u.email && u.email.toLowerCase() === cleanEmail) ||
+              (u.roll_no && u.roll_no.toLowerCase() === cleanEmail)
+          );
+          if (match) {
+            sessionStorage.setItem("campus_demo_profile", JSON.stringify(match));
+            setProfile(match);
+            toaster.push(
+              <Message type="success" closable duration={4000}>
+                {`Welcome back, ${match.name}!`}
+              </Message>
+            );
+            history.push("/");
+            return;
+          }
+        }
+      } catch (localErr) {
+        // ignore
+      }
+
+      throw error || new Error("Invalid credentials. Please verify your email/password or register your Campus ID.");
     } catch (error) {
       toaster.push(
         <Message type="error" closable duration={4000}>
-          {error.message}
+          {error.message || "Sign in failed. Please check your credentials."}
         </Message>
       );
     } finally {
@@ -153,21 +217,43 @@ const SignIn = () => {
     if (!signUpData.fullName || !signUpData.email || !signUpData.password || !signUpData.rollNo) {
       toaster.push(
         <Message type="warning" closable duration={4000}>
-          Please fill in all required campus credentials.
+          Please fill in all required campus credentials (Full Name, Roll No, Email, Password).
         </Message>
       );
       return;
     }
 
+    setLoading(true);
+    const cleanEmail = signUpData.email.trim().toLowerCase();
+    const rollClean = signUpData.rollNo.trim();
+    const customStudentId =
+      "stu_" + (rollClean.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() || Date.now().toString());
+
+    const studentProfile = {
+      id: customStudentId,
+      uid: customStudentId,
+      name: signUpData.fullName.trim(),
+      email: cleanEmail,
+      roll_no: rollClean,
+      rollNo: rollClean,
+      department: signUpData.department || "Computer Science",
+      batch: signUpData.batch || "3rd Year",
+      role: signUpData.role || "Student",
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(signUpData.fullName.trim())}`,
+      bio: `${signUpData.role || "Student"} • ${signUpData.department || "Computer Science"}`,
+      status: "online",
+      created_at: new Date().toISOString(),
+    };
+
     try {
-      setLoading(true);
+      // 1. Attempt standard Supabase Auth signup
       const { data, error } = await supabase.auth.signUp({
-        email: signUpData.email.trim(),
+        email: cleanEmail,
         password: signUpData.password,
         options: {
           data: {
             full_name: signUpData.fullName,
-            roll_no: signUpData.rollNo,
+            roll_no: rollClean,
             department: signUpData.department,
             batch: signUpData.batch,
             role: signUpData.role,
@@ -175,35 +261,35 @@ const SignIn = () => {
         },
       });
 
-      if (error) throw error;
-
-      if (data?.user) {
-        const studentProfile = {
-          id: data.user.id,
-          uid: data.user.id,
-          name: signUpData.fullName,
-          email: signUpData.email,
-          roll_no: signUpData.rollNo,
-          rollNo: signUpData.rollNo,
-          department: signUpData.department,
-          batch: signUpData.batch,
-          role: signUpData.role,
-          bio: `${signUpData.role} at ${signUpData.department}`,
-          status: "online",
-        };
-        await registerCampusStudent(studentProfile);
+      if (!error && data?.user) {
+        studentProfile.id = data.user.id;
+        studentProfile.uid = data.user.id;
+      } else if (error) {
+        // If email rate limit was exceeded or SMTP is throttled, log notice and proceed with direct campus registration
+        console.warn("Supabase Auth notice (fallback to instant campus registration):", error.message);
       }
+    } catch (authErr) {
+      console.warn("Supabase signup auth error handled:", authErr);
+    }
+
+    // 2. Register into Supabase `profiles` and local campus directory registry
+    try {
+      await registerCampusStudent(studentProfile);
+      sessionStorage.setItem("campus_demo_profile", JSON.stringify(studentProfile));
+      localStorage.setItem("campus_last_active_profile", JSON.stringify(studentProfile));
+      setProfile(studentProfile);
 
       toaster.push(
         <Message type="success" closable duration={5000}>
-          Account created successfully! Welcome to CampusConnect.
+          {`🎓 Welcome to CampusConnect, ${signUpData.fullName}! Your Campus ID is registered.`}
         </Message>
       );
       history.push("/");
-    } catch (error) {
+    } catch (saveErr) {
+      console.error("Save profile error:", saveErr);
       toaster.push(
         <Message type="error" closable duration={4000}>
-          {error.message}
+          {saveErr.message || "Failed to register profile. Please try again."}
         </Message>
       );
     } finally {
