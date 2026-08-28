@@ -1,23 +1,33 @@
-import React, { useState, useEffect } from "react";
-import { Button, Input, InputGroup, List, Loader, Modal } from "rsuite";
+import React, { useState, useEffect, useMemo } from "react";
+import { Button, Input, InputGroup, Loader, Modal, Tag } from "rsuite";
 import SearchIcon from "@rsuite/icons/Search";
 import { useHistory } from "react-router-dom";
 import { supabase } from "../../misc/supabaseClient";
 import { useProfile } from "../../context/profile.context";
 import ProfileAvatar from "../ProfileAvatar";
-import PresenceDot from "../PresenceDot";
 
 const DEFAULT_CAMPUS_DIRECTORY = [
-  { uid: "peer-priya-01", name: "Priya Sharma", email: "priya.s@vnrvjiet.in", department: "Computer Science", rollNo: "21241A0545", batch: "3rd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Priya" },
-  { uid: "peer-ravi-02", name: "Ravi Kumar", email: "ravi.k@vnrvjiet.in", department: "Information Technology", rollNo: "21241A1208", batch: "3rd Year", role: "Teaching Assistant", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ravi" },
-  { uid: "peer-rao-03", name: "Dr. K. V. Rao", email: "kv_rao@vnrvjiet.in", department: "Computer Science", rollNo: "FAC-CSE-012", batch: "Faculty", role: "Faculty", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=DrRao" },
-  { uid: "peer-sneha-04", name: "Sneha Reddy", email: "sneha.r@vnrvjiet.in", department: "Electronics & Communication", rollNo: "22241A0419", batch: "2nd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sneha" },
+  { uid: "peer-priya-01", name: "Priya Sharma", email: "priya.s@vnrvjiet.in", department: "Computer Science", rollNo: "21241A0545", batch: "3rd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Priya", status: "online" },
+  { uid: "peer-ravi-02", name: "Ravi Kumar", email: "ravi.k@vnrvjiet.in", department: "Information Technology", rollNo: "21241A1208", batch: "3rd Year", role: "Teaching Assistant", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ravi", status: "online" },
+  { uid: "peer-rao-03", name: "Dr. K. V. Rao", email: "kv_rao@vnrvjiet.in", department: "Computer Science", rollNo: "FAC-CSE-012", batch: "Faculty", role: "Faculty", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=DrRao", status: "away" },
+  { uid: "peer-sneha-04", name: "Sneha Reddy", email: "sneha.r@vnrvjiet.in", department: "Electronics & Communication", rollNo: "22241A0419", batch: "2nd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sneha", status: "online" },
+  { uid: "peer-arjun-05", name: "Arjun Patel", email: "arjun.p@vnrvjiet.in", department: "Computer Science", rollNo: "21241A0512", batch: "3rd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Arjun", status: "online" },
+  { uid: "peer-meera-06", name: "Meera Joshi", email: "meera.j@vnrvjiet.in", department: "Mechanical Engineering", rollNo: "22241A0318", batch: "2nd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Meera", status: "offline" },
+  { uid: "peer-vikram-07", name: "Vikram Singh", email: "vikram.s@vnrvjiet.in", department: "Information Technology", rollNo: "21241A1245", batch: "3rd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Vikram", status: "online" },
+  { uid: "peer-ananya-08", name: "Ananya Rao", email: "ananya.r@vnrvjiet.in", department: "Computer Science", rollNo: "22241A0501", batch: "2nd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ananya", status: "away" },
 ];
+
+const STATUS_CONFIG = {
+  online: { color: "#10b981", label: "Online", dot: "●" },
+  away: { color: "#f59e0b", label: "Away", dot: "●" },
+  offline: { color: "#94a3b8", label: "Offline", dot: "○" },
+};
 
 const StartDmModal = ({ isOpen, onClose }) => {
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState("all");
   const history = useHistory();
   const { profile } = useProfile();
 
@@ -45,6 +55,7 @@ const StartDmModal = ({ isOpen, onClose }) => {
           department: u.department,
           batch: u.batch,
           role: u.role,
+          status: ["online", "away", "offline"][Math.floor(Math.random() * 3)],
         }));
 
         if (formatted.length === 0) {
@@ -62,16 +73,29 @@ const StartDmModal = ({ isOpen, onClose }) => {
     };
 
     fetchUsers();
+    setSearch("");
+    setSelectedFilter("all");
   }, [isOpen, profile]);
 
-  const filteredUsers = users.filter((u) => {
-    const term = search.toLowerCase();
-    const nameMatch = (u.name || "").toLowerCase().includes(term);
-    const deptMatch = (u.department || "").toLowerCase().includes(term);
-    const rollMatch = (u.rollNo || "").toLowerCase().includes(term);
-    const roleMatch = (u.role || "").toLowerCase().includes(term);
-    return nameMatch || deptMatch || rollMatch || roleMatch;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const term = search.toLowerCase();
+      const textMatch =
+        (u.name || "").toLowerCase().includes(term) ||
+        (u.department || "").toLowerCase().includes(term) ||
+        (u.rollNo || "").toLowerCase().includes(term) ||
+        (u.role || "").toLowerCase().includes(term);
+
+      if (!textMatch) return false;
+
+      if (selectedFilter === "online") return u.status === "online";
+      if (selectedFilter === "students") return u.role === "Student";
+      if (selectedFilter === "faculty") return u.role === "Faculty" || u.role === "Teaching Assistant";
+      return true;
+    });
+  }, [users, search, selectedFilter]);
+
+  const onlineCount = users.filter((u) => u.status === "online").length;
 
   const onSelectUser = async (targetUser) => {
     const currentUid = profile?.uid || profile?.id;
@@ -111,72 +135,157 @@ const StartDmModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const filters = [
+    { key: "all", label: `All (${users.length})` },
+    { key: "online", label: `Online (${onlineCount})` },
+    { key: "students", label: "Students" },
+    { key: "faculty", label: "Faculty" },
+  ];
+
   return (
     <Modal open={isOpen} onClose={onClose} size="sm">
       <Modal.Header>
-        <Modal.Title>🔒 Start Private Message (Campus Directory)</Modal.Title>
+        <Modal.Title style={{ fontWeight: 800, fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span>💬</span> Start Private Conversation
+        </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
-        <InputGroup inside style={{ marginBottom: 15 }}>
+      <Modal.Body style={{ padding: "12px 20px" }}>
+        {/* Search */}
+        <InputGroup
+          inside
+          style={{
+            marginBottom: 12,
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border)",
+            overflow: "hidden",
+          }}
+        >
           <Input
-            placeholder="Search by student name, roll no, department..."
+            placeholder="Search by name, roll no, department…"
             value={search}
             onChange={setSearch}
+            style={{ fontSize: "13px" }}
           />
           <InputGroup.Addon>
             <SearchIcon />
           </InputGroup.Addon>
         </InputGroup>
 
-        {loading && <Loader center content="Searching campus directory..." />}
+        {/* Filter Chips */}
+        <div className="d-flex gap-2 mb-2" style={{ gap: "6px", flexWrap: "wrap" }}>
+          {filters.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setSelectedFilter(f.key)}
+              style={{
+                padding: "4px 12px",
+                border: selectedFilter === f.key ? "1.5px solid var(--primary)" : "1px solid var(--border)",
+                borderRadius: "var(--radius-full)",
+                background: selectedFilter === f.key ? "var(--primary-light)" : "var(--surface-elevated)",
+                color: selectedFilter === f.key ? "var(--primary)" : "var(--text-secondary)",
+                fontSize: "11px",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all var(--transition-fast)",
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* User List */}
+        {loading && <Loader center content="Searching campus directory…" style={{ padding: "30px 0" }} />}
 
         {!loading && filteredUsers.length === 0 && (
-          <div className="text-center p-3 text-black-45">
-            {search ? "No campus members match your search." : "No other users found in campus directory."}
+          <div style={{ textAlign: "center", padding: "30px 0", color: "var(--text-muted)" }}>
+            <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
+            <p style={{ fontSize: "13px" }}>
+              {search ? "No students match your search." : "No campus members found."}
+            </p>
           </div>
         )}
 
         {!loading && filteredUsers.length > 0 && (
-          <List hover bordered style={{ maxHeight: "350px", overflowY: "auto" }}>
-            {filteredUsers.map((u) => (
-              <List.Item
-                key={u.uid}
-                style={{ cursor: "pointer", padding: "10px 14px" }}
-                onClick={() => onSelectUser(u)}
-              >
-                <div className="d-flex align-items-center justify-content-between">
-                  <div className="d-flex align-items-center">
-                    <PresenceDot uid={u.uid} />
-                    <ProfileAvatar
-                      src={u.avatar}
-                      name={u.name || "Student"}
-                      size="sm"
-                      className="ml-2 mr-2"
-                    />
-                    <div>
-                      <div style={{ fontWeight: 600, color: "#1e293b" }}>
-                        {u.name}
+          <div className="custom-scroll" style={{ maxHeight: "360px", overflowY: "auto" }}>
+            {filteredUsers.map((u) => {
+              const statusCfg = STATUS_CONFIG[u.status] || STATUS_CONFIG.offline;
+              return (
+                <div
+                  key={u.uid}
+                  className="dm-peer-card"
+                  onClick={() => onSelectUser(u)}
+                  style={{ marginBottom: "4px" }}
+                >
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center" style={{ gap: "12px" }}>
+                      <div className="dm-peer-avatar-wrap">
+                        <ProfileAvatar
+                          src={u.avatar}
+                          name={u.name || "Student"}
+                          size="sm"
+                        />
+                        {u.status === "online" && <div className="dm-online-dot" />}
                       </div>
-                      <div style={{ fontSize: 12, color: "#64748b" }}>
-                        {u.department || "General"} {u.rollNo ? `• ${u.rollNo}` : ""}
+
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
+                          {u.name}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>{u.department || "General"}</span>
+                          {u.rollNo && (
+                            <>
+                              <span style={{ color: "var(--border)" }}>•</span>
+                              <span>{u.rollNo}</span>
+                            </>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "10px", color: statusCfg.color, fontWeight: 600, marginTop: "2px", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <span>{statusCfg.dot}</span>
+                          <span>{statusCfg.label}</span>
+                          {u.batch && <span style={{ color: "var(--text-muted)" }}>• {u.batch}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div>
-                    <span className="badge-pill badge-student">
-                      {u.role || "Student"}
-                    </span>
+
+                    <div className="d-flex flex-column align-items-end" style={{ gap: "4px" }}>
+                      <Tag
+                        size="sm"
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          background: u.role === "Faculty" ? "linear-gradient(135deg, #fef3c7, #fde68a)" :
+                                     u.role === "Teaching Assistant" ? "linear-gradient(135deg, #e0f2fe, #bae6fd)" :
+                                     "linear-gradient(135deg, #e0e7ff, #c7d2fe)",
+                          color: u.role === "Faculty" ? "#92400e" :
+                                 u.role === "Teaching Assistant" ? "#0369a1" : "#3730a3",
+                          border: "none",
+                        }}
+                      >
+                        {u.role || "Student"}
+                      </Tag>
+                      <span style={{ fontSize: "10px", color: "var(--primary)", fontWeight: 600, opacity: 0.7 }}>
+                        Message →
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </List.Item>
-            ))}
-          </List>
+              );
+            })}
+          </div>
         )}
       </Modal.Body>
-      <Modal.Footer>
-        <Button onClick={onClose} appearance="subtle">
-          Cancel
-        </Button>
+      <Modal.Footer style={{ borderTop: "1px solid var(--border-subtle)", padding: "12px 20px" }}>
+        <div className="d-flex align-items-center justify-content-between w-100">
+          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+            🔒 All messages are private & encrypted
+          </span>
+          <Button onClick={onClose} appearance="subtle" style={{ fontWeight: 600 }}>
+            Close
+          </Button>
+        </div>
       </Modal.Footer>
     </Modal>
   );

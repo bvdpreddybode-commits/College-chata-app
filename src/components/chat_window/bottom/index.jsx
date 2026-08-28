@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Checkbox, Input, InputGroup, Message, toaster, Button } from "rsuite";
+import { Checkbox, Input, InputGroup, Message, toaster } from "rsuite";
 import SendIcon from "@rsuite/icons/Send";
 import { useParams } from "react-router";
 import { useProfile } from "../../../context/profile.context";
@@ -152,55 +152,95 @@ const ChatBottom = () => {
 
   return (
     <div>
-      <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+      <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
         <Checkbox
           checked={isAnonymous}
           onChange={(val, checked) => setIsAnonymous(checked)}
           style={{ margin: 0, padding: 0 }}
         >
-          <span style={{ fontSize: "12px", fontWeight: isAnonymous ? 600 : 400, color: isAnonymous ? "var(--text-primary)" : "var(--text-muted)" }}>
-            🕵️ Ask Anonymously (Mask Name & Profile)
+          <span style={{
+            fontSize: "11px",
+            fontWeight: isAnonymous ? 700 : 400,
+            color: isAnonymous ? "var(--accent)" : "var(--text-muted)",
+            transition: "all var(--transition-fast)",
+          }}>
+            🕵️ {isAnonymous ? "Anonymous Mode ON" : "Ask Anonymously"}
           </span>
         </Checkbox>
 
-        <div className="d-flex align-items-center gap-2" style={{ gap: "8px" }}>
-          <Button
-            size="xs"
-            appearance="subtle"
+        <div className="d-flex align-items-center" style={{ gap: "4px" }}>
+          <button
+            type="button"
             onClick={() => {
               setInput((prev) => (prev ? `${prev}\n\`\`\`javascript\n// Write code here\n\`\`\`` : `\`\`\`javascript\n// Write code here\n\`\`\``));
             }}
-            style={{ fontSize: "12px", fontWeight: 600 }}
             title="Insert Code Snippet block"
+            style={{
+              background: "transparent",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-full)",
+              padding: "3px 10px",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+              color: "var(--text-secondary)",
+              transition: "all var(--transition-fast)",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--primary)"; e.currentTarget.style.color = "var(--primary)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
           >
-            💻 Code Snippet
-          </Button>
+            💻 Code
+          </button>
 
-          <Button
-            size="xs"
-            appearance="subtle"
+          <button
+            type="button"
             onClick={() => setIsPollModalOpen(true)}
-            style={{ fontSize: "12px", fontWeight: 600 }}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-full)",
+              padding: "3px 10px",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+              color: "var(--text-secondary)",
+              transition: "all var(--transition-fast)",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
           >
-            📊 Create Poll
-          </Button>
+            📊 Poll
+          </button>
         </div>
       </div>
 
-      <InputGroup>
+      <InputGroup
+        style={{
+          borderRadius: "var(--radius-lg)",
+          border: "1.5px solid var(--border)",
+          overflow: "hidden",
+          boxShadow: "var(--shadow-sm)",
+          transition: "all var(--transition-fast)",
+        }}
+      >
         <AttchmentBtnModal afterUpload={afterUpload} />
         <AudioMsgBtn afterUpload={afterUpload} />
         <Input
-          placeholder={isAnonymous ? "Ask your anonymous doubt or question..." : "Share notes, discuss topics, or ask a question..."}
+          placeholder={isAnonymous ? "Type your anonymous question…" : "Type a message…"}
           value={input}
           onChange={onInputChange}
           onKeyDown={onKeyDown}
+          style={{ fontSize: "13px" }}
         />
         <InputGroup.Button
           color="blue"
           appearance="primary"
           onClick={onSendClick}
-          disabled={isLoading}
+          disabled={isLoading || !input.trim()}
+          style={{
+            background: input.trim() ? "linear-gradient(135deg, var(--primary), var(--accent))" : undefined,
+            transition: "all var(--transition-fast)",
+          }}
         >
           <SendIcon />
         </InputGroup.Button>
