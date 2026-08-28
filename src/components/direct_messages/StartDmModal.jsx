@@ -5,17 +5,7 @@ import { useHistory } from "react-router-dom";
 import { supabase } from "../../misc/supabaseClient";
 import { useProfile } from "../../context/profile.context";
 import ProfileAvatar from "../ProfileAvatar";
-
-const DEFAULT_CAMPUS_DIRECTORY = [
-  { uid: "peer-priya-01", name: "Priya Sharma", email: "priya.s@vnrvjiet.in", department: "Computer Science", rollNo: "21241A0545", batch: "3rd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Priya", status: "online" },
-  { uid: "peer-ravi-02", name: "Ravi Kumar", email: "ravi.k@vnrvjiet.in", department: "Information Technology", rollNo: "21241A1208", batch: "3rd Year", role: "Teaching Assistant", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ravi", status: "online" },
-  { uid: "peer-rao-03", name: "Dr. K. V. Rao", email: "kv_rao@vnrvjiet.in", department: "Computer Science", rollNo: "FAC-CSE-012", batch: "Faculty", role: "Faculty", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=DrRao", status: "away" },
-  { uid: "peer-sneha-04", name: "Sneha Reddy", email: "sneha.r@vnrvjiet.in", department: "Electronics & Communication", rollNo: "22241A0419", batch: "2nd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sneha", status: "online" },
-  { uid: "peer-arjun-05", name: "Arjun Patel", email: "arjun.p@vnrvjiet.in", department: "Computer Science", rollNo: "21241A0512", batch: "3rd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Arjun", status: "online" },
-  { uid: "peer-meera-06", name: "Meera Joshi", email: "meera.j@vnrvjiet.in", department: "Mechanical Engineering", rollNo: "22241A0318", batch: "2nd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Meera", status: "offline" },
-  { uid: "peer-vikram-07", name: "Vikram Singh", email: "vikram.s@vnrvjiet.in", department: "Information Technology", rollNo: "21241A1245", batch: "3rd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Vikram", status: "online" },
-  { uid: "peer-ananya-08", name: "Ananya Rao", email: "ananya.r@vnrvjiet.in", department: "Computer Science", rollNo: "22241A0501", batch: "2nd Year", role: "Student", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ananya", status: "away" },
-];
+import { fetchAllCampusMembers } from "../../misc/campusDirectoryRegistry";
 
 const STATUS_CONFIG = {
   online: { color: "#10b981", label: "Online", dot: "●" },
@@ -34,45 +24,20 @@ const StartDmModal = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (!isOpen) return;
 
-    const fetchUsers = async () => {
+    const loadDirectory = async () => {
       setLoading(true);
       try {
         const currentUid = profile?.uid || profile?.id;
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .neq("id", currentUid || "none")
-          .limit(50);
-
-        if (error) throw error;
-
-        let formatted = (data || []).map((u) => ({
-          uid: u.id,
-          name: u.name,
-          email: u.email,
-          avatar: u.avatar,
-          rollNo: u.roll_no,
-          department: u.department,
-          batch: u.batch,
-          role: u.role,
-          status: ["online", "away", "offline"][Math.floor(Math.random() * 3)],
-        }));
-
-        if (formatted.length === 0) {
-          formatted = DEFAULT_CAMPUS_DIRECTORY.filter((u) => u.uid !== currentUid);
-        }
-
-        setUsers(formatted);
+        const allMembers = await fetchAllCampusMembers(currentUid);
+        setUsers(allMembers);
       } catch (err) {
-        console.error("Error fetching campus users:", err);
-        const currentUid = profile?.uid || profile?.id;
-        setUsers(DEFAULT_CAMPUS_DIRECTORY.filter((u) => u.uid !== currentUid));
+        console.error("Error loading campus directory:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUsers();
+    loadDirectory();
     setSearch("");
     setSelectedFilter("all");
   }, [isOpen, profile]);

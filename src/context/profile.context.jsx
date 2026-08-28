@@ -1,10 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase } from "../misc/supabaseClient";
-
-export const isOfflineForDatabase = {
-  state: "offline",
-  last_changed: new Date().toISOString(),
-};
+import { registerCampusStudent } from "../misc/campusDirectoryRegistry";
 
 export const DEMO_PROFILES = {
   student: {
@@ -72,6 +68,7 @@ export const ProfileProvider = ({ children }) => {
     const demoData = DEMO_PROFILES[demoKey] || DEMO_PROFILES.student;
     try {
       sessionStorage.setItem("campus_demo_profile", JSON.stringify(demoData));
+      registerCampusStudent(demoData);
     } catch (e) {
       // ignore
     }
@@ -128,7 +125,7 @@ export const ProfileProvider = ({ children }) => {
 
       if (data) {
         const role = isSuperAdmin ? "Admin" : (data.role || "Student");
-        setProfile({
+        const p = {
           ...data,
           uid: data.id,
           name: data.name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Student",
@@ -141,7 +138,9 @@ export const ProfileProvider = ({ children }) => {
           isAdmin: isSuperAdmin || role === "Admin" || data.is_admin === true,
           bio: data.bio || (isSuperAdmin ? "Platform Super Administrator" : "Campus Member"),
           hidePresence: data.hide_presence || false,
-        });
+        };
+        registerCampusStudent(p);
+        setProfile(p);
       } else {
         // Create fallback profile if not found
         const fallbackProfile = {
@@ -160,8 +159,8 @@ export const ProfileProvider = ({ children }) => {
           status: "online",
         };
 
-        // Attempt to insert profile in background
-        supabase.from("profiles").upsert(fallbackProfile).then(() => {});
+        // Register profile in background
+        registerCampusStudent(fallbackProfile);
         setProfile({
           ...fallbackProfile,
           rollNo: fallbackProfile.roll_no,

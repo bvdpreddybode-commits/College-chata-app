@@ -17,6 +17,7 @@ import {
 import { supabase } from "../misc/supabaseClient";
 import { useProfile } from "../context/profile.context";
 import { useHistory } from "react-router-dom";
+import { registerCampusStudent } from "../misc/campusDirectoryRegistry";
 
 const DEPARTMENTS = [
   { label: "Computer Science & Engineering", value: "Computer Science" },
@@ -177,18 +178,20 @@ const SignIn = () => {
       if (error) throw error;
 
       if (data?.user) {
-        // Insert or update profile row in Supabase
-        await supabase.from("profiles").upsert({
+        const studentProfile = {
           id: data.user.id,
+          uid: data.user.id,
           name: signUpData.fullName,
           email: signUpData.email,
           roll_no: signUpData.rollNo,
+          rollNo: signUpData.rollNo,
           department: signUpData.department,
           batch: signUpData.batch,
           role: signUpData.role,
           bio: `${signUpData.role} at ${signUpData.department}`,
           status: "online",
-        });
+        };
+        await registerCampusStudent(studentProfile);
       }
 
       toaster.push(
