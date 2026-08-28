@@ -132,7 +132,7 @@ const MessageContextMenu = ({
         )}
         {(isAuthor || isAdmin) && onDeleteMessage && (
           <>
-            <Dropdown.Separator />
+            <Dropdown.Item divider />
             <Dropdown.Item
               onClick={() => onDeleteMessage(message.id, message.file)}
               style={{ color: "#ef4444" }}

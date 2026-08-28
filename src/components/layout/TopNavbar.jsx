@@ -198,7 +198,7 @@ const TopNavbar = ({ activeView, onViewChange, onOpenCommandPalette, onOpenNotif
               🛡️ Admin Moderation
             </Dropdown.Item>
           )}
-          <Dropdown.Separator />
+          <Dropdown.Item divider />
           <Dropdown.Item onClick={onSignOut} style={{ color: "#ef4444" }}>
             <ExitIcon /> Sign Out
           </Dropdown.Item>
